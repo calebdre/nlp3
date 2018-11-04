@@ -21,6 +21,15 @@ class CNN(nn.Module):
         inner_lin_dim = hidden_size * 2 if interaction == "concat" else hidden_size
         self.classifier = nn.Linear(hidden_size , 3)
         
+        if interaction == "concat":
+            self.interaction = self.interaction_concat
+        elif interaction == "add":
+            self.interaction = self.interaction_add
+        elif interaction == "subtract":
+            self.interaction = self.interaction_subtract
+        else:
+            raise Exception("'{}' is an invalid interaction".format(self.interaction))
+        
     def calc_conv_dim1_size(self, seq_len):
         return seq_len + ((self.padding*2) - (self.kernel_size - 1))
     
@@ -46,27 +55,28 @@ class CNN(nn.Module):
             
             hidden = self.conv2(hidden.transpose(1,2)).transpose(1,2)
             hidden = F.relu(hidden.contiguous().view(-1, hidden.size(-1))).view(batch_size, conv2_dim1_size, hidden.size(-1))
-            hidden = self.max_pool(hidden).squeeze()
-#             hidden = hidden.view(hidden.shape[0], hidden.shape[1])
+            
+            hidden = nn.Dropout(self.dropout)(hidden)
+            
+            hidden = nn.MaxPool1d(hidden.shape[1])(hidden.transpose(1, 2)).squeeze()
             encodeds.append(hidden)
         
-        if self.interaction == "concat":
-            interacted = self.interaction_concat(*encodeds)
-        elif self.interaction == "add":
-            interacted = self.interaction_add(*encodeds)
-        elif self.interaction == "subtract":
-            interacted = self.interaction_subtract(*encodeds)
-        else:
-            raise Exception("'{}' is an invalid interaction".format(self.interaction))
+        interacted = self.interaction(*encodeds)
         
-#         l1, _ = nn.LSTM(1, self.hidden_size, dropout=self.dropout, num_layers=2, bidirectional=False, batch_first=True)(interacted.view(batch_size, interacted.shape[-1], -1))
+        lstm = nn.LSTM(1, self.hidden_size, dropout=self.dropout, num_layers=2, bidirectional=False, batch_first=True)
+        l1, _ = lstm(interacted.view(batch_size, interacted.shape[-1], -1))
+        
 #         l1 = nn.MaxPool1d(l1.shape[-1])(l1).squeeze()
+        l1 = torch.sum(l1, dim=1)
         l1 = nn.Linear(
             interacted.shape[-1], 
             int(interacted.shape[-1] / 2)
         )(interacted)
+        l1 = F.softmax(l1, -1)
             
         classified = nn.Linear(l1.shape[-1], 3)(l1)        
+        classified = F.softmax(classified, -1)
+        print(classified[0])
         return classified
             
     def interaction_concat(self, sent1, sent2):

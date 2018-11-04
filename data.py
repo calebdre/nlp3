@@ -9,9 +9,9 @@ from torch.utils.data import DataLoader
 
 from load_word_embeddings import read_word_embeddings
 
-# data_dir = "/data"
-data_dir = "../floyd_data"
-data_use = "50k"
+data_dir = "data"
+# data_dir = "../floyd_data"
+data_use = "35k"
 
 class Data(Dataset):
     modes = ["snli_train", "snli_val", "mnli_train", "mnli_val"]

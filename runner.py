@@ -7,16 +7,16 @@ import pandas as pd
 from tabulate import tabulate
 from cnn import CNN
 from gru import GRU
+from analyzer import Analyzer
 
 models_dir = "./"
 
 class Runner:
-    summaries = []
-    
     def __init__(self, data_train, data_val, use_gpu=False):
         self.data_val = data_val
         self.data_train = data_train
         self.use_gpu = use_gpu and torch.cuda.is_available()
+        self.analyzer = Analyzer()
             
         if self.use_gpu:
             print("Using GPU\n")
@@ -70,36 +70,19 @@ class Runner:
                 losses.append(instance_loss.item())
                 
                 # validate every 100 iterations
-                if i > 0 and i % 50 == 0:
+                if i > 0 and i % 100 == 0:
                     val_acc = self.validate(model)
                     accuracies.append(val_acc)
-                    print('Epoch: [{}/{}]\tStep: [{}/{}]\tValidation Acc: {:4f}'.format(
+                    print('Epoch: [{}/{}]\tStep: [{}/{}]\tValidation Acc: {:.4f}'.format(
                             epoch, epochs, i, len(loader), val_acc
                         )
                     )
 
-        #self.plot_learning_rate(losses)
         avg_acc = sum(accuracies[-5:]) / 5
-        print("Recording...\n")
-        self.record(model.cpu(), losses, epochs=epochs, learning_rate=learning_rate, hidden_size=hidden_size, kernel_size=kernel_size,validation_accuracy=avg_acc, model_name=model_cls, dropout = dropout, interaction=interaction, hypothesis=hypothesis, data_length=32 * len(loader))
-    
-    def plot_learning_rate(self, losses):
-        plt.plot(losses)
-        plt.xlabel("Time-Step")
-        plt.ylabel("Loss")
-        plt.title("Run #{} Learning Rate".format(len(self.summaries) + 1))
-        plt.show()
-    
-    def record(self, model, losses, **kwargs):
-        run_info = {
-            "losses": losses, 
-            "model": model,
-            "run_data": kwargs
-        }
-        self.summaries.append(run_info)
         
-        with open("{}/run-{}.pkl".format(models_dir, int(time.time())), "wb+") as f:
-            pickle.dump(run_info, f, protocol=pickle.HIGHEST_PROTOCOL)
+        self.analyzer.record(model.cpu(), losses, epochs=epochs, learning_rate=learning_rate, hidden_size=hidden_size, kernel_size=kernel_size,validation_accuracy=avg_acc, model_name=model_cls, dropout = dropout, interaction=interaction, hypothesis=hypothesis, data_length=32 * len(loader))
+        self.analyzer.plot_learning_rate()
+    
 
     def validate(self, model):
         model.eval()
@@ -121,24 +104,6 @@ class Runner:
             total += labels.size(0)
             correct += predictions.eq(labels.view_as(predictions)).sum().item()
         return (100 * correct / total).item()
-
-    @staticmethod
-    def summarize():
-        print("hydrating runs...")
-        summaries = []
-        for fname in os.listdir(models_dir):
-            if ".pkl" in fname:
-                with open("{}/{}".format(models_dir, fname), "rb") as f:
-                    summaries.append(pickle.load(f)["run_data"])
-        
-        print("Summary:\n")
-        pretty = tabulate(
-            summaries, 
-            headers="keys", 
-            tablefmt='github', 
-            showindex=range(1, len(summaries)+1)
-        )
-        print(pretty)
             
     def test(self):
         raise Exception("Not implemented")

@@ -5,6 +5,7 @@ from data import Data
 from gru import GRU
 from cnn import CNN
 from runner import Runner
+from analyzer import Analyzer
 
 def run(params, d_train, d_val):
     runner = Runner(d_train, d_val, use_gpu = True)
@@ -40,7 +41,7 @@ def train(model_name, batch_size = 32, epochs = 10, hypothesis = None, altered_p
     else:
         run(params, data_train, data_val)
     
-    Runner.summarize()
+    Analyzer().summarize()
 
 if __name__ == "__main__":
     num_args = len(sys.argv)

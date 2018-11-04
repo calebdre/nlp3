@@ -23,7 +23,7 @@ class Analyzer:
             run_data, 
             headers="keys", 
             tablefmt='github', 
-            showindex=range(1, len(summaries)+1)
+            showindex=range(1, len(run_data)+1)
         )
         print(pretty)
     
@@ -46,3 +46,7 @@ class Analyzer:
         plt.ylabel("Loss")
         plt.title(title)
         plt.show()
+        
+
+if __name__ == "__main__":
+    Analyzer().summarize()

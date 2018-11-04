@@ -12,7 +12,7 @@ def run(params, d_train, d_val):
     start = time()
     runner.train(**params)
     elapsed = time() - start
-    print("\nTraining took {}s".format(elapsed))
+    print("\nTraining took {}s\n\n".format(elapsed))
 
 def train(model_name, batch_size = 32, epochs = 10, hypothesis = None, altered_params=None):
     data_train = Data(mode ="snli_train", batch_size = batch_size, hydrate = True)
@@ -26,7 +26,8 @@ def train(model_name, batch_size = 32, epochs = 10, hypothesis = None, altered_p
         "hidden_size": 100,
         "model_cls": model_name,
         "interaction": "concat",
-        "dropout": .1
+        "dropout": .1,
+        "weight_decay": 0
     }
 
     if altered_params is not None:
@@ -64,7 +65,7 @@ if __name__ == "__main__":
         epochs = int(sys.argv[2])
         hypothesis = sys.argv[3]
         
-        param_names = ["hypothesis", "epochs", "learning_rate", "kernel_size", "encoder_size", "hidden_size", "model_cls", "interaction"]
+        param_names = ["weight_decay", "dropout", "learning_rate", "kernel_size", "encoder_size", "hidden_size", "model_cls", "interaction"]
         param_indices = [i for i, inp in enumerate(sys.argv) if inp in param_names]
         altered_params = {}
         for i in range(1, len(param_indices)+1):

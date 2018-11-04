@@ -23,7 +23,7 @@ class Runner:
         
     def train(
         self, epochs, learning_rate, kernel_size, hidden_size, 
-        model_cls, interaction, hypothesis, dropout
+        model_cls, interaction, hypothesis, dropout, weight_decay
     ):
         if model_cls == "cnn":
             model = CNN(
@@ -47,7 +47,7 @@ class Runner:
 
         loader = self.data_train.get_loader()
         loss_fn = torch.nn.CrossEntropyLoss()
-        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
         
         losses = []
         accuracies = []
@@ -73,6 +73,8 @@ class Runner:
                 if i > 0 and i % 100 == 0:
                     val_acc = self.validate(model)
                     accuracies.append(val_acc)
+                    if "floyd" in os.environ:
+                        print('{"metric": "Validation Accuracy ({})", "value": {}}'.format(self.analyzer.current_run_num, val_acc))
                     print('Epoch: [{}/{}]\tStep: [{}/{}]\tValidation Acc: {:.4f}'.format(
                             epoch, epochs, i, len(loader), val_acc
                         )
@@ -80,9 +82,8 @@ class Runner:
 
         avg_acc = sum(accuracies[-5:]) / 5
         
-        self.analyzer.record(model.cpu(), losses, epochs=epochs, learning_rate=learning_rate, hidden_size=hidden_size, kernel_size=kernel_size,validation_accuracy=avg_acc, model_name=model_cls, dropout = dropout, interaction=interaction, hypothesis=hypothesis, data_length=32 * len(loader))
-        self.analyzer.plot_learning_rate()
-    
+        self.analyzer.record(model.cpu(), losses, epochs=epochs, learning_rate=learning_rate, hidden_size=hidden_size, weight_decay=weight_decay, kernel_size=kernel_size,validation_accuracy=avg_acc, model_name=model_cls, dropout = dropout, interaction=interaction, hypothesis=hypothesis, data_length=32 * len(loader))
+#         self.analyzer.plot_learning_rate()
 
     def validate(self, model):
         model.eval()
@@ -107,6 +108,3 @@ class Runner:
             
     def test(self):
         raise Exception("Not implemented")
-
-if __name__ == "__main__":
-    Runner.summarize()

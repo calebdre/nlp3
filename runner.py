@@ -73,8 +73,6 @@ class Runner:
                 if i > 0 and i % 100 == 0:
                     val_acc = self.validate(model)
                     accuracies.append(val_acc)
-                    if "floyd" in os.environ:
-                        print('{"metric": "Validation Accuracy ({})", "value": {}}'.format(self.analyzer.current_run_num, val_acc))
                     print('Epoch: [{}/{}]\tStep: [{}/{}]\tValidation Acc: {:.4f}'.format(
                             epoch, epochs, i, len(loader), val_acc
                         )

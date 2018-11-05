@@ -76,7 +76,6 @@ class CNN(nn.Module):
             
         classified = nn.Linear(l1.shape[-1], 3)(l1)        
         classified = F.softmax(classified, -1)
-        print(classified[0])
         return classified
             
     def interaction_concat(self, sent1, sent2):

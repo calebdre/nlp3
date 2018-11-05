@@ -9,14 +9,12 @@ from cnn import CNN
 from gru import GRU
 from analyzer import Analyzer
 
-models_dir = "./"
-
 class Runner:
     def __init__(self, data_train, data_val, use_gpu=False):
         self.data_val = data_val
         self.data_train = data_train
         self.use_gpu = use_gpu and torch.cuda.is_available()
-        self.analyzer = Analyzer()
+        self.analyzer = Analyzer(False)
             
         if self.use_gpu:
             print("Using GPU\n")
@@ -70,13 +68,15 @@ class Runner:
                 losses.append(instance_loss.item())
                 
                 # validate every 100 iterations
-                if i > 0 and i % 100 == 0:
+                if i > 0 and i % 50 == 0:
                     val_acc = self.validate(model)
                     accuracies.append(val_acc)
                     print('Epoch: [{}/{}]\tStep: [{}/{}]\tValidation Acc: {:.4f}'.format(
                             epoch, epochs, i, len(loader), val_acc
                         )
                     )
+                    self.analyzer.plot_live_lr(losses)
+                    
 
         avg_acc = sum(accuracies[-5:]) / 5
         

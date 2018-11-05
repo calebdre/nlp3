@@ -22,7 +22,7 @@ def train(model_name, batch_size = 32, epochs = 10, hypothesis = None, altered_p
         "hypothesis": hypothesis,
         "epochs": epochs,
         "learning_rate": .001,
-        "kernel_size": 4,
+        "kernel_size": 2,
         "hidden_size": 450,
         "model_cls": model_name,
         "interaction": "concat",

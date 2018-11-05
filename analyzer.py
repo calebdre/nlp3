@@ -6,18 +6,19 @@ import time
 from tabulate import tabulate
 import operator
 
-models_dir = "models"
+models_dir = "../models"
 
 class Analyzer:
     runs = []
     
-    def __init__(self):
-        print("fetching runs...")
-        for fname in os.listdir(models_dir):
-            if ".pkl" in fname:
-                with open("{}/{}".format(models_dir, fname), "rb") as f:
-                    self.runs.append(pickle.load(f))
-        self.runs = sorted(self.runs, key=lambda x: x["run_data"]["validation_accuracy"], reverse=True)
+    def __init__(self, fetch=True):
+        if fetch:
+            print("fetching runs...")
+            for fname in os.listdir(models_dir):
+                if ".pkl" in fname:
+                    with open("{}/{}".format(models_dir, fname), "rb") as f:
+                        self.runs.append(pickle.load(f))
+            self.runs = sorted(self.runs, key=lambda x: x["run_data"]["validation_accuracy"], reverse=True)
     
     def summarize(self):
         print("Summary:\n")
@@ -42,6 +43,11 @@ class Analyzer:
         with open("{}/run-{}.pkl".format(models_dir, int(time.time())), "wb+") as f:
             pickle.dump(run_info, f, protocol=pickle.HIGHEST_PROTOCOL)
     
+    def plot_live_lr(self, losses):
+        plt.plot(losses)
+        plt.ylabel("Loss")
+        plt.show()
+
     def plot_lr(self, *run_nums):
         if len(run_nums) == 1:
             num = run_nums[0]

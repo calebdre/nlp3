@@ -6,7 +6,7 @@ from math import ceil
 from multiprocessing import Pool, cpu_count
 import os
 
-embeddings_dir = "/data/embeds"
+embeddings_dir = "..//data/embeds"
 embeddings_filename = "{}/wiki-news-300d-1M-embedding".format(embeddings_dir)
 vec_filename = "../../wiki-news-300d-1M.vec"
 

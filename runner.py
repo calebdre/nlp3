@@ -21,12 +21,13 @@ class Runner:
         
     def train(
         self, epochs, learning_rate, kernel_size, hidden_size, 
-        model_cls, interaction, hypothesis, dropout, weight_decay
+        model_cls, interaction, dropout, weight_decay
     ):
         if model_cls == "cnn":
             model = CNN(
                 embedding = self.data_train.vocab_embedding, 
                 embedding_size = self.data_train.vocab_embedding_size, 
+                lengths = self.data_train.lengths(),
                 kernel_size = kernel_size, 
                 hidden_size = hidden_size,
                 interaction = interaction,
@@ -50,6 +51,7 @@ class Runner:
         losses = []
         accuracies = []
         for epoch in range(1, epochs+1):
+            e_loss = []
             print("\nStarting epoch {}".format(epoch))
             for i, (s1, s2, labels) in enumerate(loader):
                 if self.use_gpu:
@@ -66,21 +68,21 @@ class Runner:
                 optimizer.step()
                 
                 losses.append(instance_loss.item())
+                e_loss.append(instance_loss.item())
                 
                 # validate every 100 iterations
-                if i > 0 and i % 50 == 0:
+                if i > 0 and i % 100 == 0:
                     val_acc = self.validate(model)
                     accuracies.append(val_acc)
                     print('Epoch: [{}/{}]\tStep: [{}/{}]\tValidation Acc: {:.4f}'.format(
                             epoch, epochs, i, len(loader), val_acc
                         )
                     )
-                    self.analyzer.plot_live_lr(losses)
-                    
+#             self.analyzer.plot_live_lr(e_loss, title="Epoch {}".format(epoch))
 
         avg_acc = sum(accuracies[-5:]) / 5
         
-        self.analyzer.record(model.cpu(), losses, epochs=epochs, learning_rate=learning_rate, hidden_size=hidden_size, weight_decay=weight_decay, kernel_size=kernel_size,validation_accuracy=avg_acc, model_name=model_cls, dropout = dropout, interaction=interaction, hypothesis=hypothesis, data_length=32 * len(loader))
+        self.analyzer.record(model.cpu(), losses, epochs=epochs, accuracies=accuracies, learning_rate=learning_rate, hidden_size=hidden_size, weight_decay=weight_decay, kernel_size=kernel_size,validation_accuracy=avg_acc, model_name=model_cls, dropout = dropout, interaction=interaction, data_length=32 * len(loader))
 #         self.analyzer.plot_learning_rate()
 
     def validate(self, model):

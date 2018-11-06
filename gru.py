@@ -8,18 +8,18 @@ class GRU(nn.Module):
         self.embedding = nn.Embedding.from_pretrained(embedding)
         self.gru = nn.GRU(embedding_size, encoding_size, 1, batch_first=True, bidirectional=True)
         
-        inner_lin_dim = encoding_size * 2
+        inner_lin_dim = encoding_size * 2 if interaction == "concat" else encoding_size
         self.inner_layer = nn.LSTM(inner_lin_dim, int(encoding_size / 2), 1, batch_first=True, bidirectional=True)
         self.classifier = nn.Linear(encoding_size, 3)
         self.dropout = nn.Dropout(dropout)
         
         if interaction == "concat":
             self.interaction = self.interaction_concat
-        elif self.interaction == "add":
+        elif interaction == "add":
             self.interaction = self.interaction_add
-        elif self.interaction == "subtract":
+        elif interaction == "sub":
             self.interaction = self.interaction_subtract
-        elif self.interaction == "mult":
+        elif interaction == "mult":
             self.interaction = self.interaction_multiply
         else:
             raise Exception("'{}' is an invalid interaction".format(self.interaction))
@@ -61,4 +61,3 @@ class GRU(nn.Module):
    
     def interaction_multiply(self, x1, x2):
         return x1 * x2
-

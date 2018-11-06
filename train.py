@@ -19,14 +19,13 @@ def train(model_name, batch_size = 32, epochs = 10, hypothesis = None, altered_p
     data_val = Data(mode="snli_val", batch_size = batch_size, hydrate = True)
     
     params = {
-        "hypothesis": hypothesis,
         "epochs": epochs,
         "learning_rate": .001,
         "kernel_size": 2,
         "hidden_size": 450,
         "model_cls": model_name,
         "interaction": "concat",
-        "dropout": .6,
+        "dropout": .65,
         "weight_decay": 0
     }
 
@@ -63,7 +62,6 @@ if __name__ == "__main__":
     elif num_args > 4:
 
         epochs = int(sys.argv[2])
-        hypothesis = sys.argv[3]
         
         param_names = ["weight_decay", "dropout", "learning_rate", "kernel_size", "encoder_size", "hidden_size", "model_cls", "interaction"]
         param_indices = [i for i, inp in enumerate(sys.argv) if inp in param_names]
@@ -79,6 +77,6 @@ if __name__ == "__main__":
                 prev = param_indices[i-1]
                 altered_params[sys.argv[prev]] = [int(arg) if arg.isnumeric() else arg for arg in sys.argv[prev+1:idx]]
 
-        train(model_name, epochs = epochs, hypothesis = hypothesis, altered_params = altered_params)
+        train(model_name, epochs = epochs, altered_params = altered_params)
     else:
         train(model_name)

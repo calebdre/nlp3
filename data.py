@@ -9,9 +9,9 @@ from torch.utils.data import DataLoader
 
 from load_word_embeddings import read_word_embeddings
 
-data_dir = "../data"
-# data_dir = "../floyd_data"
-data_use = "35k"
+# data_dir = "../data"
+data_dir = "../floyd_data"
+data_use = "100k"
 
 class Data(Dataset):
     modes = ["snli_train", "snli_val", "mnli_train", "mnli_val"]
@@ -44,6 +44,14 @@ class Data(Dataset):
             collate_fn=self.collate,
             shuffle=True
         )
+
+    def lengths(self):
+        lengths = []
+        x1, x2, y = self.get_data()
+        for x1i, x2i in zip(x1, x2):
+            lengths.append(len(x1i))
+            lengths.append(len(x2i))
+        return set(lengths)
     
     def fetch(self):
         filename = "{}/{}.tsv".format(data_dir, self.mode)
@@ -65,7 +73,6 @@ class Data(Dataset):
         self.vocab_embedding_size = self.vocab_embedding.shape[1]
             
     def preprocess(self):
-        self.data = {}
         X = getattr(self, self.mode)
         y = X.pop("label")
         
@@ -74,13 +81,20 @@ class Data(Dataset):
             X = X.iloc[:self.num_rows]
             y = y[:self.num_rows]
                 
+        
         y = torch.tensor(y.astype('category').cat.codes.values.astype(np.int32))
+        if self.mode == "mnli_val":
+            genre = X.pop("genre")
+            
         X = self.to_indices(X)
         
         X_1, X_2 = X.values.T
-        self.data = (X_1, X_2, y)
+        if self.mode == "mnli_val":
+            self.data = (X_1, X_2, y, genre)
+        else:
+            self.data = (X_1, X_2, y)
         self.save()
-            
+        
     def hydrate(self):
         fname = "{}/data-{}-{}.pickle".format(data_dir, self.mode, data_use)
         with open(fname, "rb") as f:
@@ -131,11 +145,15 @@ class Data(Dataset):
         if key is None:
             return self.data
         else:
-            return (
+            data = [
                 self.data[0][key],
                 self.data[1][key],
                 self.data[2][key]
-            )
+            ]
+            if "mnli" in self.mode:
+                data.append(self.data[3][key])
+
+            return data
         
     def collate(self, batch):
         """
@@ -145,10 +163,14 @@ class Data(Dataset):
         s1_list = []
         s2_list = []
         label_list = []
+        genres = []
+        
         max_sentence_len = max([max(len(datum[0]), len(datum[1])) for datum in batch])
         # padding
         for datum in batch:
             label_list.append(datum[2])
+            if "mnli" in self.mode:
+                genres.append(datum[3])
             
             padded_s1 = np.pad(
                 datum[0], 
@@ -164,11 +186,16 @@ class Data(Dataset):
             s1_list.append(padded_s1)
             s2_list.append(padded_s2)
 
-        return [
+        collated = [
             torch.LongTensor(s1_list),
             torch.LongTensor(s2_list),
             torch.LongTensor(label_list)
         ]
+        
+        if "mnli" in self.mode:
+            collated.append(genres)
+        
+        return collated
         
     def __len__(self):
         return len(self.data[0])

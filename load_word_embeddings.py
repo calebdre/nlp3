@@ -6,9 +6,9 @@ from math import ceil
 from multiprocessing import Pool, cpu_count
 import os
 
-embeddings_dir = "..//data/embeds"
+embeddings_dir = "../data/embeds"
 embeddings_filename = "{}/wiki-news-300d-1M-embedding".format(embeddings_dir)
-vec_filename = "../../wiki-news-300d-1M.vec"
+vec_filename = "../../../wiki-news-300d-1M.vec"
 
 def human_format(num):
     magnitude = 0
@@ -26,7 +26,7 @@ def load_word_embeddings(top_n = 1000000, file_size = 50000):
     num_files = ceil(top_n / file_size)
     
     print("Loading {} words into memory...".format(top_n))
-    for i in range(top_n):
+    for i in range(top_n+1):
         tokens = fin.readline().rstrip().split(' ')
         word = tokens[0]
         vec = torch.tensor(list(map(float, tokens[1:])))

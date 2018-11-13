@@ -8,7 +8,7 @@ class CNN(nn.Module):
 
         self.hidden_size = hidden_size
         self.kernel_size = kernel_size
-        self.interaction = interaction
+        self.interaction_t = interaction
         self.dropout = nn.Dropout(dropout)
         self.padding = 1
         
@@ -60,7 +60,8 @@ class CNN(nn.Module):
                 s1, s2, out = self.conv_dim1_sizes(l)
                 if s2 < 1:
                     s2 = 1
-                layers[l] = nn.Linear(s2 * 2, output_size)
+                s2 = s2 * 2 if self.interaction_t == "concat" else s2
+                layers[l] = nn.Linear(s2, output_size)
         
         self.inner_layer_defs = layers
 
@@ -75,8 +76,10 @@ class CNN(nn.Module):
             self.interaction = self.interaction_concat
         elif interaction == "add":
             self.interaction = self.interaction_add
-        elif interaction == "subtract":
+        elif interaction == "sub":
             self.interaction = self.interaction_subtract
+        elif interaction == "mult":
+            self.interaction = self.interaction_mult
         else:
             raise Exception("'{}' is an invalid interaction".format(self.interaction))
             
@@ -84,10 +87,13 @@ class CNN(nn.Module):
         return torch.cat((sent1, sent2), 1) 
     
     def interaction_add(self, sent1, sent2):
-        return sent1 - sent2
+        return sent1 + sent2
     
     def interaction_subtract(self, sent1, sent2):
-        return torch.mul(sent1, sent2)
+        return sent1 - sent2
+    
+    def interaction_mult(self, sent1, sent2):
+        return sent1 * sent2
     
     def calc_conv_dim1_size(self, seq_len, kernel_size):
         return seq_len + ((self.padding*2) - (kernel_size - 1))

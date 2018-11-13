@@ -21,7 +21,7 @@ class Runner:
         
     def train(
         self, epochs, learning_rate, kernel_size, hidden_size, 
-        model_cls, interaction, dropout, weight_decay
+        model_cls, interaction, dropout
     ):
         if model_cls == "cnn":
             model = CNN(
@@ -46,7 +46,7 @@ class Runner:
 
         loader = self.data_train.get_loader()
         loss_fn = torch.nn.CrossEntropyLoss()
-        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
         
         losses = []
         accuracies = []
@@ -82,29 +82,67 @@ class Runner:
 
         avg_acc = sum(accuracies[-5:]) / 5
         
-        self.analyzer.record(model.cpu(), losses, epochs=epochs, accuracies=accuracies, learning_rate=learning_rate, hidden_size=hidden_size, weight_decay=weight_decay, kernel_size=kernel_size,validation_accuracy=avg_acc, model_name=model_cls, dropout = dropout, interaction=interaction, data_length=32 * len(loader))
-#         self.analyzer.plot_learning_rate()
+        self.analyzer.record(model.cpu(), losses, epochs=epochs, accuracies=accuracies, learning_rate=learning_rate, hidden_size=hidden_size, kernel_size=kernel_size,validation_accuracy=avg_acc, model_name=model_cls, dropout = dropout, interaction=interaction, data_length=32 * len(loader))
+        self.analyzer.print_validation_results(self, model_cls, model)
+        print("Final Accuracy: {}".format(avg_acc))
 
-    def validate(self, model):
-        model.eval()
-        correct = torch.Tensor([0])
+    def validate(self, *models, data = None, keep_predictions = False):
         total = torch.Tensor([0])
         
+        corrects = [torch.Tensor([0]) for m in models]
+        models = [model.eval() for model in models]
+        all_labels = torch.Tensor([]).long()
+        all_preds = [torch.Tensor([]).long() for m in models]
+        all_s1s = []
+        all_s2s = []
+        genres = []
+        
         if self.use_gpu:
-            model = model.cuda()
-            correct = correct.cuda()
             total = total.cuda()
             
-        loader = self.data_val.get_loader()
+            models = [model.cuda() for model in models]
+            corrects = [correct.cuda() for correct in corrects]
+            all_preds = [pred.cuda() for pred in all_preds]
+            all_labels = all_labels.cuda()
+        
+        if data is None:
+            data = self.data_val
+            
+        loader = data.get_loader()
         llen = len(loader)
-        for i, (s1, s2, labels) in enumerate(loader):
+        for i, batch in enumerate(loader):
+            if "mnli" in data.mode:
+                s1, s2, labels, genre = batch
+            else:
+                s1, s2, labels = batch
+                
             if self.use_gpu:
                 s1, s2, labels = s1.cuda(), s2.cuda(), labels.cuda()
-            logits = model(s1, s2)
-            predictions = logits.max(1)[1]
-            total += labels.size(0)
-            correct += predictions.eq(labels.view_as(predictions)).sum().item()
-        return (100 * correct / total).item()
+            for j, model in enumerate(models):
+                logits = model(s1, s2)
+                preds = logits.max(1)[1]
+                all_preds[j] = torch.cat((all_preds[j], preds))
+                corrects[j] += preds.eq(labels).sum().item()
             
-    def test(self):
-        raise Exception("Not implemented")
+            total += labels.size(0)
+            all_s1s += [s for s in s1]
+            all_s2s += [s for s in s2]
+            if "mnli" in data.mode:
+                genres += genre
+            all_labels = torch.cat((all_labels, labels))
+
+        print(corrects, total)
+        accuracies = [(100 * correct / total).item() for correct in corrects]
+        
+        if len(models) == 1:
+            all_preds = all_preds[0]
+            accuracies = accuracies[0]
+        
+        if keep_predictions:
+            output = [accuracies, all_s1s, all_s2s, all_labels, all_preds]
+            if "mnli" in data.mode:
+                output.append(genres)
+            
+            return output
+        else:
+            return accuracies

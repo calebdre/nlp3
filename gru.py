@@ -9,8 +9,9 @@ class GRU(nn.Module):
         self.gru = nn.GRU(embedding_size, encoding_size, 1, batch_first=True, bidirectional=True)
         
         inner_lin_dim = encoding_size * 2 if interaction == "concat" else encoding_size
-        self.inner_layer = nn.LSTM(inner_lin_dim, int(encoding_size / 2), 1, batch_first=True, bidirectional=True)
-        self.classifier = nn.Linear(encoding_size, 3)
+        lstm_out = int(encoding_size / 2)
+        self.inner_layer = nn.LSTM(inner_lin_dim, lstm_out, 1, batch_first=True, bidirectional=True)
+        self.classifier = nn.Linear(lstm_out* 2, 3)
         self.dropout = nn.Dropout(dropout)
         
         if interaction == "concat":

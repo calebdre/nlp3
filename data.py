@@ -9,13 +9,14 @@ from torch.utils.data import DataLoader
 
 from load_word_embeddings import read_word_embeddings
 
-# data_dir = "../data"
-data_dir = "../floyd_data"
+data_dir = "../data"
+# data_dir = "../floyd_data"
 data_use = "100k"
 
 class Data(Dataset):
     modes = ["snli_train", "snli_val", "mnli_train", "mnli_val"]
     unknown_token = "<unknown>"
+    pad_token = "<pad>"
     
     def __init__(self, mode = "snli_train", num_rows = None, hydrate = False, batch_size = 32):
         self.batch_size = batch_size
@@ -33,10 +34,26 @@ class Data(Dataset):
 
             print("Fetching word embeddings...")
             self.prep_vocab()
+            
+            X = self.data
+            y = X.pop("label")
+            if "mnli" in mode:
+                self.genre = X.pop("genre")
+        
+            print("Processing data...")        
+            self.preprocess(X, y)
+            
+        if "mnli" in mode:
+            self.data = (*self.data, self.genre)
 
-            print("Processing data...")
-            self.preprocess()
-
+    @property
+    def unknown_idx(self):
+        return self.vocab[self.unknown_token]
+    
+    @property
+    def pad_idx(self):
+        return self.vocab[self.pad_token]
+    
     def get_loader(self):
         return DataLoader(
             dataset=self,
@@ -47,7 +64,9 @@ class Data(Dataset):
 
     def lengths(self):
         lengths = []
-        x1, x2, y = self.get_data()
+        d = self.get_data()
+        x1, x2 = d[0], d[1]
+            
         for x1i, x2i in zip(x1, x2):
             lengths.append(len(x1i))
             lengths.append(len(x2i))
@@ -57,42 +76,33 @@ class Data(Dataset):
         filename = "{}/{}.tsv".format(data_dir, self.mode)
         print("fetching {}".format(filename))
         
-        data = pd.read_csv(filename, delimiter="\t", index_col=False)
-        setattr(self, self.mode, data)
+        self.data = pd.read_csv(filename, delimiter="\t", index_col=False)
         
     def prep_vocab(self):
         self.vocab_embedding, self.vocab_size, self.vocab_vec_size = read_word_embeddings()
         
+        self.vocab_embedding.pop(",")
         self.vocab_embedding[self.unknown_token] = torch.zeros(self.vocab_vec_size)
+        self.vocab_embedding[self.pad_token] = torch.zeros(self.vocab_vec_size)
         
         words = list(self.vocab_embedding.keys())
         self.vocab = dict(zip(words, range(len(words))))
         self.vocab_idx = dict(zip(range(len(words)), words))
-        
+                
         self.vocab_embedding = torch.stack(list(self.vocab_embedding.values()))
         self.vocab_embedding_size = self.vocab_embedding.shape[1]
-            
-    def preprocess(self):
-        X = getattr(self, self.mode)
-        y = X.pop("label")
-        
+    
+    def preprocess(self, X, y):
         if self.num_rows is not None:
             print("Only taking {} rows".format(self.num_rows))
             X = X.iloc[:self.num_rows]
             y = y[:self.num_rows]
-                
         
-        y = torch.tensor(y.astype('category').cat.codes.values.astype(np.int32))
-        if self.mode == "mnli_val":
-            genre = X.pop("genre")
-            
+        y = torch.tensor(y.astype('category').cat.codes.values.astype(np.int32))    
         X = self.to_indices(X)
         
         X_1, X_2 = X.values.T
-        if self.mode == "mnli_val":
-            self.data = (X_1, X_2, y, genre)
-        else:
-            self.data = (X_1, X_2, y)
+        self.data = (X_1, X_2, y)
         self.save()
         
     def hydrate(self):
@@ -111,8 +121,11 @@ class Data(Dataset):
                 "vocab": self.vocab,
                 "vocab_idx": self.vocab_idx,
                 "vocab_embedding": self.vocab_embedding,
-                "vocab_embedding_size": self.vocab_embedding_size,
+                "vocab_embedding_size": self.vocab_embedding_size
             }
+            
+            if "mnli" in self.mode:
+                to_save["genre"] = self.genre
 
             pickle.dump(to_save, f, protocol=pickle.HIGHEST_PROTOCOL)
         
@@ -125,10 +138,13 @@ class Data(Dataset):
             return self.vocab[self.unknown_token]
     
     def to_token(self, idx):
+        if type(idx) == torch.Tensor:
+            idx = idx.item()
+        
         return self.vocab_idx[idx]
     
     def to_sentence(self, idxs):
-        return " ".join([self.to_token(idx) for idx in idxs])
+        return " ".join([self.to_token(idx) for idx in idxs if idx != self.pad_idx])
     
     def to_indices(self, X):
         def to_index_func(sentence):
@@ -151,7 +167,7 @@ class Data(Dataset):
                 self.data[2][key]
             ]
             if "mnli" in self.mode:
-                data.append(self.data[3][key])
+                data.append(self.genre)
 
             return data
         
@@ -163,7 +179,7 @@ class Data(Dataset):
         s1_list = []
         s2_list = []
         label_list = []
-        genres = []
+        genres = []            
         
         max_sentence_len = max([max(len(datum[0]), len(datum[1])) for datum in batch])
         # padding
@@ -175,12 +191,14 @@ class Data(Dataset):
             padded_s1 = np.pad(
                 datum[0], 
                 (0, max_sentence_len - len(datum[0])), 
-                "constant"
+                "constant",
+                constant_values=self.pad_idx
             )
             padded_s2 =  np.pad(
                 datum[1], 
                 (0, max_sentence_len - len(datum[1])), 
-                "constant"
+                "constant",
+                constant_values=self.pad_idx
             )
             
             s1_list.append(padded_s1)
@@ -191,7 +209,6 @@ class Data(Dataset):
             torch.LongTensor(s2_list),
             torch.LongTensor(label_list)
         ]
-        
         if "mnli" in self.mode:
             collated.append(genres)
         
@@ -201,9 +218,7 @@ class Data(Dataset):
         return len(self.data[0])
     
     def __getitem__(self, key):
-        X1, X2, y = self.get_data(key)
-        return X1, X2, y
-
+        return self.get_data(key)
     
 if __name__ == "__main__":
     print("Generating data file...")

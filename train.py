@@ -26,7 +26,6 @@ def train(model_name, batch_size = 32, epochs = 10, hypothesis = None, altered_p
         "model_cls": model_name,
         "interaction": "concat",
         "dropout": .65,
-        "weight_decay": 0
     }
 
     if altered_params is not None:
